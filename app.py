@@ -1,76 +1,97 @@
 import streamlit as st
-import requests
+import yt_dlp
+import os
+import tempfile
 
-# Configuração da página
-st.set_page_config(
-    page_title="Baixador de MP3 do YouTube",
-    page_icon="🎵",
-    layout="centered"
-)
+st.set_page_config(page_title="Baixador MP3 Pro", page_icon="🎵")
+st.title("🎵 Baixador de MP3")
+st.write("Cole a URL do vídeo abaixo para converter e baixar o áudio.")
 
-st.title("🎵 Baixador de MP3 do YouTube")
-st.write("Cole o link de qualquer vídeo do YouTube para extrair o áudio em MP3 instantaneamente.")
+url_input = st.text_input("Link do vídeo:")
 
-# Campo de entrada da URL
-url_input = st.text_input("URL do Vídeo:", placeholder="https://www.youtube.com/watch?v=...")
+def progress_hook(d):
+    if d['status'] == 'downloading':
+        try:
+            p = d.get('_percent_str', '0%').replace('%', '').strip()
+            percentagem = float(p) / 100.0
+            barra_progresso.progress(min(max(percentagem, 0.0), 1.0))
+            speed = d.get('_speed_str', 'N/A')
+            status_text.text(f"Baixando: {p}% | Velocidade: {speed}")
+        except ValueError:
+            pass
+    elif d['status'] == 'finished':
+        barra_progresso.progress(1.0)
+        status_text.text("Download concluído! Finalizando arquivo MP3...")
 
 if st.button("Converter para MP3", type="primary"):
-    url_limpa = url_input.strip()
-    
-    if not url_limpa:
-        st.warning("⚠️ Por favor, insira uma URL válida do YouTube.")
+    url = url_input.strip()
+    if not url:
+        st.warning("⚠️ Insira uma URL válida.")
     else:
-        with st.spinner("⚡ Conectando ao serviço e preparando o áudio..."):
+        status_text = st.empty()
+        barra_progresso = st.progress(0.0)
+        status_text.text("Conectando e ignorando travas de IP...")
+
+        # Lista de proxies/instâncias para contornar o bloqueio de datacenter
+        lista_proxies = [None, 'https://inv.tux.pizza', 'https://invidious.nerdvpn.de']
+        sucesso = False
+
+        for proxy in lista_proxies:
+            if sucesso:
+                break
             try:
-                # Payload para a API do Cobalt pedir a conversão direta para MP3
-                payload = {
-                    "url": url_limpa,
-                    "downloadMode": "audio",
-                    "audioFormat": "mp3",
-                    "audioBitrate": "320"
-                }
-                
-                headers = {
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
-                }
-                
-                # Requisição à API pública do Cobalt
-                response = requests.post(
-                    "https://api.cobalt.tools/api/json",
-                    json=payload,
-                    headers=headers,
-                    timeout=15
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    status = data.get("status")
-                    
-                    # Trata o retorno do link gerado
-                    if status in ["tunnel", "redirect"]:
-                        download_url = data.get("url")
-                        
-                        st.success("✅ Áudio convertido com sucesso!")
-                        st.markdown(
-                            f'<a href="{download_url}" target="_blank" style="text-decoration:none;">'
-                            f'<button style="width:100%; height:50px; background-color:#4CAF50; color:white; '
-                            f'border:none; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer;">'
-                            f'⬇️ Clique aqui para baixar o MP3'
-                            f'</button></a>',
-                            unsafe_allow_html=True
-                        )
-                    else:
-                        erro_msg = data.get("text", "Não foi possível processar este vídeo.")
-                        st.error(f"❌ Erro do serviço: {erro_msg}")
-                else:
-                    st.error("❌ O serviço de conversão respondeu com erro. Verifique a URL e tente novamente.")
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    ydl_opts = {
+                        'format': 'bestaudio/best',
+                        'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
+                        'progress_hooks': [progress_hook],
+                        'postprocessors': [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }],
+                        'quiet': True,
+                        'no_warnings': True,
+                        'nocheckcertificate': True,
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['ios', 'mweb'],
+                                'player_skip': ['webpage', 'configs'],
+                            }
+                        },
+                        'http_headers': {
+                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+                        }
+                    }
 
-            except requests.exceptions.Timeout:
-                st.error("⏱️ A requisição demorou muito para responder. Tente novamente em alguns segundos.")
+                    if proxy:
+                        ydl_opts['proxy'] = proxy
+
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(url, download=True)
+                        filename = ydl.prepare_filename(info)
+                        mp3_filename = os.path.splitext(filename)[0] + ".mp3"
+
+                        if os.path.exists(mp3_filename):
+                            with open(mp3_filename, "rb") as file:
+                                file_bytes = file.read()
+                                st.download_button(
+                                    label="⬇️ Baixar Arquivo MP3",
+                                    data=file_bytes,
+                                    file_name=os.path.basename(mp3_filename),
+                                    mime="audio/mpeg"
+                                )
+                            st.success("✅ Áudio gerado com sucesso!")
+                            status_text.empty()
+                            sucesso = True
             except Exception as e:
-                st.error(f"❌ Ocorreu um erro ao processar o pedido: {e}")
+                # Tenta o próximo proxy se falhar
+                continue
 
-# Rodapé simples
+        if not sucesso:
+            st.error("❌ O YouTube bloqueou a requisição em todas as rotas. Tente novamente em alguns instantes ou verifique se o link está correto.")
+            barra_progresso.empty()
+            status_text.empty()
+
 st.markdown("---")
-st.caption("Ferramenta para conversão direta de áudio sem armazenar arquivos no servidor.")
+st.caption("Conversor de Áudio Online.")
