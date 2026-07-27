@@ -1,122 +1,76 @@
 import streamlit as st
-import yt_dlp
-import os
-import tempfile
-import time
+import requests
 
-# Título da Aplicação
-st.set_page_config(page_title="Baixador MP3 Pro", page_icon="🎵")
-st.title("🎵YouTube- MP3 DOWNLOAD - GRÁTIS -")
-st.write("Cole a URL do vídeo abaixo para converter e baixar o áudio em tempo real.")
+# Configuração da página
+st.set_page_config(
+    page_title="Baixador de MP3 do YouTube",
+    page_icon="🎵",
+    layout="centered"
+)
 
-# Campo para o usuário colar o link
-url_input = st.text_input("Link do vídeo (ex: https://www.youtube.com/watch?v=...)")
+st.title("🎵 Baixador de MP3 do YouTube")
+st.write("Cole o link de qualquer vídeo do YouTube para extrair o áudio em MP3 instantaneamente.")
 
-# Define onde salvar as mensagens de progresso
-if 'progresso_msg' not in st.session_state:
-    st.session_state.progresso_msg = "Aguardando início..."
+# Campo de entrada da URL
+url_input = st.text_input("URL do Vídeo:", placeholder="https://www.youtube.com/watch?v=...")
 
-
-# --- Configuração do Hook de Progresso ---
-# Esta função é chamada pelo yt-dlp a cada atualização
-def progress_hook(d):
-    if d['status'] == 'downloading':
-        try:
-            # Tenta extrair a porcentagem atual e converter para float
-            p = d.get('_percent_str', '0%').replace('%', '')
-            percentagem = float(p) / 100.0
-            # Atualiza a barra de progresso no Streamlit
-            barra_progresso.progress(percentagem)
-
-            # Formata a mensagem de status (velocidade, tempo restante, etc)
-            speed = d.get('_speed_str', 'N/A')
-            eta = d.get('_eta_str', 'N/A')
-            status_text.text(f"Baixando: {p}% | Velocidade: {speed} | Restante: {eta}")
-        except ValueError:
-            pass
-    elif d['status'] == 'finished':
-        barra_progresso.progress(1.0)
-        status_text.text("Download concluído! Iniciando conversão para MP3...")
-
-
-# --- Botão de Ação ---
-if st.button("Converter para MP3 em Tempo Real"):
-    url = url_input.strip()
-    if not url:
-        st.warning("⚠️ Por favor, insira uma URL válida.")
-    else:
-        # Cria espaços na interface para serem atualizados dinamicamente
-        status_text = st.empty()
-        barra_progresso = st.progress(0.0)
-        status_text.text("Conectando ao YouTube...")
-
-        try:
-            # Cria uma pasta temporária segura
-            with tempfile.TemporaryDirectory() as temp_dir:
-                ydl_opts = {
-    'format': 'bestaudio/best',
-    'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
-    'progress_hooks': [progress_hook],
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-    'quiet': True,
-    'no_warnings': True,
+if st.button("Converter para MP3", type="primary"):
+    url_limpa = url_input.strip()
     
-    # Configurações para burlar bloqueio do YouTube na nuvem
-    'extractor_args': {
-        'youtube': {
-            # O cliente ios e mweb são os mais estáveis contra o bloqueio de IP
-            'player_client': ['ios', 'mweb'],
-            'player_skip': ['webpage', 'configs'],
-        }
-    },
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-    }
-}
-                # Executa o processo de download e conversão
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    # Extrai informações (sem baixar) para pegar o nome do arquivo
-                    info = ydl.extract_info(url, download=False)
-
-                    # Inicia o download real (isso ativará o progress_hook)
-                    ydl.download([url])
-
-                    # Descobre o nome final do arquivo MP3 gerado
-                    # (Mesmo nome base do vídeo, mas extensão .mp3)
-                    filename = ydl.prepare_filename(info)
-                    mp3_filename = os.path.splitext(filename)[0] + ".mp3"
-
-                # Verifica se o arquivo final realmente existe
-                if os.path.exists(mp3_filename):
-                    # Fornece o arquivo para download no navegador
-                    with open(mp3_filename, "rb") as file:
-                        # Lê os dados do arquivo
-                        file_bytes = file.read()
-
-                        # Mostra o botão de download
-                        st.download_button(
-                            label="⬇️ Baixar Arquivo MP3 Gerado",
-                            data=file_bytes,
-                            file_name=os.path.basename(mp3_filename),
-                            mime="audio/mpeg"
+    if not url_limpa:
+        st.warning("⚠️ Por favor, insira uma URL válida do YouTube.")
+    else:
+        with st.spinner("⚡ Conectando ao serviço e preparando o áudio..."):
+            try:
+                # Payload para a API do Cobalt pedir a conversão direta para MP3
+                payload = {
+                    "url": url_limpa,
+                    "downloadMode": "audio",
+                    "audioFormat": "mp3",
+                    "audioBitrate": "320"
+                }
+                
+                headers = {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                }
+                
+                # Requisição à API pública do Cobalt
+                response = requests.post(
+                    "https://api.cobalt.tools/api/json",
+                    json=payload,
+                    headers=headers,
+                    timeout=15
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    status = data.get("status")
+                    
+                    # Trata o retorno do link gerado
+                    if status in ["tunnel", "redirect"]:
+                        download_url = data.get("url")
+                        
+                        st.success("✅ Áudio convertido com sucesso!")
+                        st.markdown(
+                            f'<a href="{download_url}" target="_blank" style="text-decoration:none;">'
+                            f'<button style="width:100%; height:50px; background-color:#4CAF50; color:white; '
+                            f'border:none; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer;">'
+                            f'⬇️ Clique aqui para baixar o MP3'
+                            f'</button></a>',
+                            unsafe_allow_html=True
                         )
-                    st.success("✅ Tudo pronto! Clique no botão acima para baixar.")
-                    status_text.empty()  # Limpa o texto de status
+                    else:
+                        erro_msg = data.get("text", "Não foi possível processar este vídeo.")
+                        st.error(f"❌ Erro do serviço: {erro_msg}")
                 else:
-                    st.error("Erro interno: O arquivo MP3 não foi gerado.")
+                    st.error("❌ O serviço de conversão respondeu com erro. Verifique a URL e tente novamente.")
 
-        except Exception as e:
-            st.error(f"❌ Ocorreu um erro ao processar o vídeo: {e}")
-            # Limpa a barra em caso de erro
-            if 'barra_progresso' in locals():
-                barra_progresso.empty()
-            if 'status_text' in locals():
-                status_text.empty()
+            except requests.exceptions.Timeout:
+                st.error("⏱️ A requisição demorou muito para responder. Tente novamente em alguns segundos.")
+            except Exception as e:
+                st.error(f"❌ Ocorreu um erro ao processar o pedido: {e}")
 
 # Rodapé simples
 st.markdown("---")
-st.caption("Desenvolvido com ❤️ #Aranha-Developer")
+st.caption("Ferramenta para conversão direta de áudio sem armazenar arquivos no servidor.")
