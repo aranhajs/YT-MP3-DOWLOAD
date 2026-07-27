@@ -1,56 +1,48 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import urllib.parse
 
 st.set_page_config(page_title="Baixador MP3 Pro", page_icon="🎵")
 st.title("🎵 Baixador de MP3")
-st.write("O áudio é processado diretamente pelo seu navegador, evitando restrições de IP.")
+st.write("Cole o link do vídeo do YouTube para gerar o botão de download direto via IP do seu navegador.")
 
-url_input = st.text_input("Link do vídeo do YouTube:")
+url_input = st.text_input("Link do vídeo (ex: https://www.youtube.com/watch?v=...):")
 
-if st.button("Gerar Download", type="primary"):
+if st.button("Gerar Link de Download", type="primary"):
     url = url_input.strip()
     if not url:
-        st.warning("⚠️ Insira uma URL válida.")
+        st.warning("⚠️ Por favor, insira uma URL válida.")
     else:
-        st.info("⚡ Processando pelo seu navegador...")
+        # Codifica a URL com segurança para não quebrar os parâmetros HTTP
+        url_encoded = urllib.parse.quote(url, safe='')
         
-        # Componente HTML/JS que executa no lado do cliente (IP do Usuário)
-        js_code = f"""
-        <script>
-            async function downloadAudio() {{
-                const videoUrl = "{url}";
-                try {{
-                    // Usa a API do Cobalt acionada do IP do cliente
-                    const response = await fetch("https://api.cobalt.tools/api/json", {{
-                        method: "POST",
-                        headers: {{
-                            "Accept": "application/json",
-                            "Content-Type": "application/json"
-                        }},
-                        body: JSON.stringify({{
-                            url: videoUrl,
-                            downloadMode: "audio",
-                            audioFormat: "mp3"
-                        }})
-                    }});
-                    
-                    const data = await response.json();
-                    
-                    if (data.status === "tunnel" || data.status === "redirect") {{
-                        // Dispara o download diretamente no navegador do usuário
-                        window.open(data.url, '_blank');
-                    }} else {{
-                        alert("Erro ao converter o vídeo: " + (data.text || "Vídeo indisponível"));
-                    }}
-                }} catch (err) {{
-                    alert("Erro de rede ao conectar com o conversor.");
-                }}
-            }}
-            downloadAudio();
-        </script>
-        """
-        components.html(js_code, height=0)
-        st.success("✅ Solicitação enviada! Se o download não iniciar automaticamente, verifique se o seu navegador bloqueou pop-ups.")
+        # Link de processamento do Cobalt acionado no lado do cliente
+        cobalt_web_url = f"https://cobalt.tools/#url={url_encoded}"
+        
+        st.success("✅ Link de extração gerado com sucesso!")
+        st.info("Para contornar os bloqueios de IP do servidor do YouTube, o processamento ocorre via requisição do seu próprio navegador.")
+        
+        # Botão estilizado de redirecionamento direto
+        st.markdown(
+            f'''
+            <a href="{cobalt_web_url}" target="_blank" style="text-decoration: none;">
+                <button style="
+                    width: 100%;
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 14px 20px;
+                    margin: 8px 0;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: bold;
+                ">
+                    🚀 Clique aqui para abrir a página de download (MP3)
+                </button>
+            </a>
+            ''',
+            unsafe_allow_html=True
+        )
 
 st.markdown("---")
-st.caption("Processamento via Client-Side (IP do Usuário).")
+st.caption("Processamento direto no lado do cliente (Client-Side).")
