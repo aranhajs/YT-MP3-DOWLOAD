@@ -65,16 +65,16 @@ if st.button("Converter para MP3 em Tempo Real"):
     'quiet': True,
     'no_warnings': True,
     
-    # === BURLAR "VIDEO UNAVAILABLE" NA NUVEM ===
+    # Configurações para burlar bloqueio do YouTube na nuvem
     'extractor_args': {
         'youtube': {
-            # Tenta usar o player de TV embarcada e web creator que ignoram travas de IP
-            'player_client': ['tv_embedded', 'web_creator', 'mweb'],
+            # O cliente ios e mweb são os mais estáveis contra o bloqueio de IP
+            'player_client': ['ios', 'mweb'],
             'player_skip': ['webpage', 'configs'],
         }
     },
     'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (SmartHUB; SMART-TV; U; Linux/SmartTV) AppleWebKit/537.42 (KHTML, like Gecko) Safari/537.42',
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
     }
 }
                 # Executa o processo de download e conversão
