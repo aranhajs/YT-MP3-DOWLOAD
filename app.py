@@ -65,18 +65,18 @@ if st.button("Converter para MP3 em Tempo Real"):
     'quiet': True,
     'no_warnings': True,
     
-    # === BURLAR BLOQUEIO DE DATACENTER/NUVEM ===
+    # === BURLAR "VIDEO UNAVAILABLE" NA NUVEM ===
     'extractor_args': {
         'youtube': {
-            'player_client': ['android', 'ios', 'mweb'],
-            'skip': ['webpage', 'configs'],
+            # Tenta usar o player de TV embarcada e web creator que ignoram travas de IP
+            'player_client': ['tv_embedded', 'web_creator', 'mweb'],
+            'player_skip': ['webpage', 'configs'],
         }
     },
     'http_headers': {
-        'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 11; en_US) gzip',
+        'User-Agent': 'Mozilla/5.0 (SmartHUB; SMART-TV; U; Linux/SmartTV) AppleWebKit/537.42 (KHTML, like Gecko) Safari/537.42',
     }
 }
-
                 # Executa o processo de download e conversão
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     # Extrai informações (sem baixar) para pegar o nome do arquivo
