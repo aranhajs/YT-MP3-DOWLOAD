@@ -15,43 +15,50 @@ if st.button("Converter para MP3", type="primary"):
         st.warning("⚠️ Por favor, insira uma URL válida.")
     else:
         status = st.empty()
-        status.text("⚡ Conectando ao YouTube e contornando travas de IP...")
+        status.text("⚡ Conectando ao YouTube e contornando autenticação...")
         
-        try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # pytubefix com client WEB_CREATOR/ANDROID para ignorar restrição de datacenter
-                yt = YouTube(url, client='WEB_CREATOR')
-                
-                status.text(f"🎬 Vídeo encontrado: {yt.title}\nExtraindo o áudio...")
-                
-                # Filtra apenas a melhor faixa de áudio
-                audio_stream = yt.streams.filter(only_audio=True).first()
-                
-                # Baixa o arquivo para a pasta temporária
-                out_file = audio_stream.download(output_path=temp_dir)
-                
-                # Converte a extensão baixada (.m4a / .webm) para .mp3
-                base, ext = os.path.splitext(out_file)
-                new_file = base + '.mp3'
-                os.rename(out_file, new_file)
-                
-                # Lê os bytes para o botão de download do Streamlit
-                with open(new_file, 'rb') as f:
-                    audio_bytes = f.read()
-                
-                status.empty()
-                st.success(f"✅ **{yt.title}** convertido com sucesso!")
-                
-                st.download_button(
-                    label="⬇️ Baixar Arquivo MP3",
-                    data=audio_bytes,
-                    file_name=f"{yt.title}.mp3",
-                    mime="audio/mpeg"
-                )
+        # Lista de clientes que não exigem login para faixas de áudio
+        clientes = ['TV_EMBEDDED', 'WEB_EMBEDDED', 'ANDROID_TESTSUITE']
+        sucesso = False
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for cliente in clientes:
+                if sucesso:
+                    break
+                try:
+                    status.text(f"Tentando extrair áudio (Modo: {cliente})...")
+                    yt = YouTube(url, client=cliente)
+                    
+                    audio_stream = yt.streams.filter(only_audio=True).first()
+                    if not audio_stream:
+                        audio_stream = yt.streams.get_audio_only()
 
-        except Exception as e:
-            status.empty()
-            st.error(f"❌ Não foi possível baixar este vídeo no momento. Detalhes do erro: {e}")
+                    if audio_stream:
+                        out_file = audio_stream.download(output_path=temp_dir)
+                        
+                        base, ext = os.path.splitext(out_file)
+                        new_file = base + '.mp3'
+                        os.rename(out_file, new_file)
+                        
+                        with open(new_file, 'rb') as f:
+                            audio_bytes = f.read()
+                        
+                        status.empty()
+                        st.success(f"✅ **{yt.title}** convertido com sucesso!")
+                        
+                        st.download_button(
+                            label="⬇️ Baixar Arquivo MP3",
+                            data=audio_bytes,
+                            file_name=f"{yt.title}.mp3",
+                            mime="audio/mpeg"
+                        )
+                        sucesso = True
+                except Exception as e:
+                    continue
+
+            if not sucesso:
+                status.empty()
+                st.error("❌ O YouTube exigiu autenticação de conta para este vídeo específico. Tente outro link ou tente novamente em instantes.")
 
 st.markdown("---")
-st.caption("Conversor de Áudio Online com PyTubeFix.")
+st.caption("Conversor de Áudio Online.")
