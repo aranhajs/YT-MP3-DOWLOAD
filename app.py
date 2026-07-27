@@ -55,18 +55,28 @@ if st.button("Converter para MP3 em Tempo Real"):
             with tempfile.TemporaryDirectory() as temp_dir:
                 ydl_opts = {
                     'format': 'bestaudio/best',
-                    # Define a pasta temporária para o download
                     'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
-                    # === Configura o Hook de Progresso ===
                     'progress_hooks': [progress_hook],
-                    # === Configuração da conversão MP3 ===
                     'postprocessors': [{
                         'key': 'FFmpegExtractAudio',
                         'preferredcodec': 'mp3',
-                        'preferredquality': '320',
+                        'preferredquality': '192',
                     }],
-                    'quiet': True,  # Silencia logs excessivos no terminal
+                    'quiet': True,
                     'no_warnings': True,
+
+                    # === CORREÇÃO DO ERRO 403 ONLINE ===
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'en-us,en;q=0.5',
+                    },
+                    'extractor_args': {
+                        'youtube': {
+                            # Força o yt-dlp a usar os clientes mweb/android para burlar o bloqueio de datacenter
+                            'player_client': ['mweb', 'android'],
+                        }
+                    }
                 }
 
                 # Executa o processo de download e conversão
